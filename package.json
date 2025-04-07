@@ -1,0 +1,16 @@
+{
+  "name": "ivan-agent",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Ivan Turianytsia",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@mistralai/mistralai": "^1.5.2",
+    "dotenv": "^16.4.7"
+  }
+}
