@@ -11,10 +11,38 @@ const apiKey = process.env.MISTRAL_API_KEY;
 const client = new Mistral({apiKey: apiKey});
 
 const mainPrompt = `
-You are a writing assistant. If a user asks you to write something or edit text, use the EDIT tool.
-If the user asks you any other question, reply with "NO".
-To use the edit tool, reply with "EDIT" and: text you want to replace (<from></from>), and text you want to replace it with (<to></to>).
-For example: "EDIT <from>cat</from> <to>dog</to>".
+You are a writing assistant.
+You can use tools to edit the current text.
+If using the tools, place the tool use in the end of your response.
+If not using the tools, just write the response for the user.
+Don't print the new text in the response, only print the tool use.
+You can explain your actions with prose, before tool use.
+
+Example tool use:
+<replace-tool>
+  <from>old text</from>
+  <to>new text</to>
+</replace-tool>
+
+Here's the tools at your disposal:
+- name: replace-tool
+  description: A user asks you to write something or replace text.
+  params:
+    - name: from
+      type: string
+      description: text you want to replace.
+    - name: to
+      type: string
+      description: text you want to replace it with.
+- name: sum-tool
+  description: A user asks you to calculate the sum of 2 numbers.
+  params:
+    - name: left
+      type: number
+      description: the first number.
+    - name: right
+      type: number
+      description: the second number.
 `
 
 async function getCompletion(systemPrompt, userPrompt) {
@@ -49,21 +77,29 @@ app.post('/api/edit', async (req, res) => {
     const systemPrompt = `${mainPrompt}<currentText>${currentText}</currentText>`;
 
     const response = await getCompletion(systemPrompt, userPrompt);
-    
+    const {newText} = getReplaceToolResult(currentText, response);
 
-    if (!response.startsWith('EDIT')) {
-        return res.status(400).json({ error: 'Can\'t handle this request' });
-    }
-    
-    const from = response.split('<from>')[1].split('</from>')[0];
-    const to = response.split('<to>')[1].split('</to>')[0];
-    
-    const newText = currentText.replace(from, to);
 
     res.json({
-        newText: newText,
+        response: response.split('<replace-tool>')[0].trim(),
+        newText,
     });
 });
+
+const getReplaceToolResult = (currentText, response) => {
+    const replaceToolResponse = response.match(/<replace-tool>([\s\S]*?)<\/replace-tool>/);
+    if (!replaceToolResponse) {
+        return { newText: currentText };
+    }
+
+    const params = replaceToolResponse[1].trim();
+    const from = params.match(/<from>([\s\S]*?)<\/from>/)[1];
+    const to = params.match(/<to>([\s\S]*?)<\/to>/)[1];
+
+    const newText = currentText.replace(from, to);
+
+    return { newText }
+}
 
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
